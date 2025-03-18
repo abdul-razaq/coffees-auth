@@ -11,6 +11,8 @@ import { User } from 'src/users/entities/user.entity';
 import { Repository } from 'typeorm';
 import jwtConfig from '../config/jwt.config';
 import { HashingService } from '../hashing/hashing.service';
+import { ActiveUserData } from '../interfaces/active-user-data.interface';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { SignInDto } from './dto/sign-in.dto';
 import { SignUpDto } from './dto/sign-up.dto';
 
@@ -58,19 +60,54 @@ export class AuthenticationService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const accessToken = await this.jwtService.signAsync(
+    return await this.generateTokens(existingUser);
+  }
+
+  public async refreshToken(refreshTokenDto: RefreshTokenDto) {
+    try {
+      const { sub } = await this.jwtService.verifyAsync<
+        Pick<ActiveUserData, 'sub'>
+      >(refreshTokenDto.refresh_token, {
+        issuer: this.jwtConfiguration.issuer,
+        audience: this.jwtConfiguration.audience,
+        secret: this.jwtConfiguration.secret,
+      });
+
+      const existingUser = await this.usersRespository.findOneByOrFail({
+        id: sub,
+      });
+
+      return await this.generateTokens(existingUser);
+    } catch (error) {
+      throw new UnauthorizedException();
+    }
+  }
+
+  public async generateTokens(existingUser: User) {
+    const [accessToken, refreshToken] = await Promise.all([
+      this.signToken<Partial<ActiveUserData>>(
+        existingUser.id,
+        this.jwtConfiguration.accessTokenTtl,
+        { email: existingUser.email },
+      ),
+      this.signToken(existingUser.id, this.jwtConfiguration.refreshTokenTtl),
+    ]);
+
+    return { accessToken, refreshToken };
+  }
+
+  private async signToken<T>(userId: number, expiresIn: number, payload?: T) {
+    return await this.jwtService.signAsync(
       {
-        sub: existingUser.id,
-        email: existingUser.email,
-      },
+        sub: userId,
+        ...payload,
+      } as ActiveUserData,
       {
         audience: this.jwtConfiguration.audience,
         issuer: this.jwtConfiguration.issuer,
         secret: this.jwtConfiguration.secret,
-        expiresIn: this.jwtConfiguration.accessTokenTtl,
+        expiresIn,
       },
     );
-
-    return { accessToken };
   }
 }
