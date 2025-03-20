@@ -12,6 +12,9 @@ import { RefreshTokenIdsStorage } from './authentication/refresh-token-ids.stora
 import jwtConfig from './config/jwt.config';
 import { BcryptService } from './hashing/bcrypt.service';
 import { HashingService } from './hashing/hashing.service';
+import { GoogleAuthenticationService } from './authentication/social/google-authentication.service';
+import { GoogleAuthenticationController } from './authentication/social/google-authentication.controller';
+import { OtpAuthenticationService } from './authentication/otp-authentication.service';
 
 @Module({
   imports: [
@@ -31,7 +34,9 @@ import { HashingService } from './hashing/hashing.service';
     AccessTokenGuard,
     AuthenticationService,
     RefreshTokenIdsStorage,
+    GoogleAuthenticationService,
+    OtpAuthenticationService,
   ],
-  controllers: [AuthenticationController],
+  controllers: [AuthenticationController, GoogleAuthenticationController],
 })
 export class IamModule {}
